@@ -69,11 +69,29 @@ class UnifiedScraper:
             username = source.strip().replace('@', '')
             
             try:
-                # Use Instagram's public web profile info API
+                # Use Instagram's public web profile info API with enhanced headers
                 url = f"https://www.instagram.com/api/v1/users/web_profile_info/?username={username}"
+                
+                # Try multiple user agents for better success rate
+                user_agents = [
+                    'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1',
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Instagram 292.0.0.32.108 Android (31/12; 420dpi; 1080x2400; samsung; SM-G991B; o1s; exynos2100; en_US; 492781143)'
+                ]
+                
                 headers = {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'X-IG-App-ID': '936619743392459'  # Instagram web app ID (public)
+                    'User-Agent': user_agents[0],
+                    'X-IG-App-ID': '936619743392459',  # Instagram web app ID (public)
+                    'X-ASBD-ID': '129477',
+                    'X-IG-WWW-Claim': '0',
+                    'Accept': '*/*',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    'Accept-Encoding': 'gzip, deflate, br',
+                    'Origin': 'https://www.instagram.com',
+                    'Referer': f'https://www.instagram.com/{username}/',
+                    'Sec-Fetch-Dest': 'empty',
+                    'Sec-Fetch-Mode': 'cors',
+                    'Sec-Fetch-Site': 'same-origin'
                 }
                 
                 response = requests.get(url, headers=headers, timeout=10)
