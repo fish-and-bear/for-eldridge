@@ -108,17 +108,21 @@ class TwitterSyndicationScraper:
         url = f"{self.base_url}/srv/timeline-profile/screen-name/{username}"
         
         try:
-            response = self.session.get(url)
+            response = self.session.get(url, timeout=10)
             
             if response.status_code == 200:
                 # Extract the JSON data from the HTML response
                 html = response.text
                 
                 # Find the __NEXT_DATA__ script tag which contains all the tweet data
-                json_match = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', html)
+                json_match = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', html, re.DOTALL)
                 
                 if json_match:
-                    data = json.loads(json_match.group(1))
+                    try:
+                        data = json.loads(json_match.group(1))
+                    except (json.JSONDecodeError, ValueError) as e:
+                        print(f"JSON decode error for {username}: {e}")
+                        return []
                     
                     # Navigate to the timeline entries
                     timeline = data.get('props', {}).get('pageProps', {}).get('timeline', {})
