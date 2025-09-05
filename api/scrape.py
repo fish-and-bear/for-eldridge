@@ -250,8 +250,8 @@ class UnifiedScraper:
                                 
                                 results.append(post_data)
                             
+                            success = True
                             print(f"✅ Arctic Shift API SUCCESS: Found {len(results)} posts")
-                            return {'status': 'success', 'data': results, 'source': 'arctic_shift_api'}
                             
                 except Exception as arctic_error:
                     print(f"Arctic Shift API error: {arctic_error}")
