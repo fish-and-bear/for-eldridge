@@ -13,8 +13,13 @@ try:
     from syndication_scraper import TwitterSyndicationScraper, InstagramPublicScraper
     SCRAPERS_AVAILABLE = True
 except ImportError as e:
-    print(f"Import error: {e}")
     SCRAPERS_AVAILABLE = False
+
+try:
+    from xcancel_twitter import XCancelTwitterScraper
+    XCANCEL_AVAILABLE = True
+except ImportError:
+    XCANCEL_AVAILABLE = False
 
 class UnifiedScraper:
     def __init__(self):
@@ -26,37 +31,70 @@ class UnifiedScraper:
             self.advanced_scraper = None
             self.twitter_scraper = None
             self.instagram_scraper = None
+        
+        # Initialize xcancel scraper if available
+        if XCANCEL_AVAILABLE:
+            self.xcancel_scraper = XCancelTwitterScraper()
+        else:
+            self.xcancel_scraper = None
     
     def scrape_twitter(self, sources, bearer_token, cookies):
-        if not self.twitter_scraper:
-            return [{"error": "Twitter scraper not available"}]
-        
         results = []
+        
         for source in sources:
             username = source.strip().replace('@', '')
-            try:
-                tweets = self.twitter_scraper.scrape_user_timeline(username, limit=20)
-                for tweet in tweets:
-                    results.append({
-                        'platform': 'twitter',
-                        'username': f'@{username}',
-                        'text': tweet.get('text', ''),
-                        'created_at': tweet.get('created_at', ''),
-                        'likes': tweet.get('likes', 0),
-                        'retweets': tweet.get('retweets', 0),
-                        'url': tweet.get('permalink', '')
-                    })
-                if not tweets:
-                    results.append({
-                        'platform': 'twitter',
-                        'username': f'@{username}',
-                        'error': 'No tweets found'
-                    })
-            except Exception as e:
+            tweets_found = False
+            
+            # Strategy 1: Try xcancel first for complete timeline
+            if self.xcancel_scraper:
+                try:
+                    tweets = self.xcancel_scraper.scrape_user_timeline(username, limit=30)
+                    if tweets and not any('error' in tweet for tweet in tweets):
+                        # xcancel succeeded
+                        for tweet in tweets:
+                            results.append({
+                                'platform': 'twitter',
+                                'username': f'@{username}',
+                                'text': tweet.get('text', ''),
+                                'created_at': tweet.get('created_at', ''),
+                                'likes': tweet.get('likes', 0),
+                                'retweets': tweet.get('retweets', 0),
+                                'replies': tweet.get('replies', 0),
+                                'url': tweet.get('url', ''),
+                                'media': tweet.get('media', []),
+                                'is_retweet': tweet.get('is_retweet', False),
+                                'source': 'xcancel_complete_timeline'
+                            })
+                        tweets_found = True
+                except Exception:
+                    pass  # Fallback to syndication API
+            
+            # Strategy 2: Fallback to Twitter Syndication API
+            if not tweets_found and self.twitter_scraper:
+                try:
+                    tweets = self.twitter_scraper.scrape_user_timeline(username, limit=20)
+                    for tweet in tweets:
+                        results.append({
+                            'platform': 'twitter',
+                            'username': f'@{username}',
+                            'text': tweet.get('text', ''),
+                            'created_at': tweet.get('created_at', ''),
+                            'likes': tweet.get('likes', 0),
+                            'retweets': tweet.get('retweets', 0),
+                            'url': tweet.get('permalink', ''),
+                            'source': 'syndication_api_popular'
+                        })
+                    if tweets:
+                        tweets_found = True
+                except Exception:
+                    pass
+            
+            # If neither strategy worked, return error
+            if not tweets_found:
                 results.append({
                     'platform': 'twitter',
                     'username': f'@{username}',
-                    'error': str(e)
+                    'error': 'Could not fetch tweets from any available source'
                 })
         return results
     
