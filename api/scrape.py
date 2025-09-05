@@ -128,75 +128,67 @@ class UnifiedScraper:
 
 scraper = UnifiedScraper()
 
-def handler(request):
-    """Vercel serverless function for scraping"""
-    
-    # Handle CORS preflight
-    if request.get('method') == 'OPTIONS':
-        return {
-            'statusCode': 200,
-            'headers': {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type'
-            },
-            'body': ''
-        }
-    
-    try:
-        # Parse request body
-        if isinstance(request.get('body'), str):
-            data = json.loads(request.get('body', '{}'))
-        else:
-            data = request.get('body', {})
-        
-        platform = data.get('platform')
-        sources = data.get('sources', [])
-        
-        if not platform or not sources:
-            return {
-                'statusCode': 400,
-                'headers': {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                },
-                'body': json.dumps({'error': 'Platform and sources required'})
-            }
-        
-        # Route to appropriate scraper
-        if platform == 'twitter':
-            results = scraper.scrape_twitter(sources, '', '')
-        elif platform == 'instagram':
-            results = scraper.scrape_instagram(sources, {})
-        elif platform == 'reddit':
-            results = scraper.scrape_reddit(sources, {})
-        else:
-            results = [{'error': f'Unsupported platform: {platform}'}]
-        
-        return {
-            'statusCode': 200,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
-            'body': json.dumps({
+from http.server import BaseHTTPRequestHandler
+
+class handler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            data = json.loads(post_data.decode('utf-8'))
+            
+            platform = data.get('platform')
+            sources = data.get('sources', [])
+            
+            if not platform or not sources:
+                self.send_response(400)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                error_response = {'error': 'Platform and sources required'}
+                self.wfile.write(json.dumps(error_response).encode())
+                return
+            
+            # Route to appropriate scraper
+            if platform == 'twitter':
+                results = scraper.scrape_twitter(sources, '', '')
+            elif platform == 'instagram':
+                results = scraper.scrape_instagram(sources, {})
+            elif platform == 'reddit':
+                results = scraper.scrape_reddit(sources, {})
+            else:
+                results = [{'error': f'Unsupported platform: {platform}'}]
+            
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            
+            response = {
                 'status': 'success',
                 'platform': platform,
                 'results': results,
                 'count': len(results),
                 'timestamp': datetime.now().strftime('%Y%m%d_%H%M%S')
-            })
-        }
-    
-    except Exception as e:
-        return {
-            'statusCode': 500,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
-            'body': json.dumps({
+            }
+            
+            self.wfile.write(json.dumps(response).encode())
+            
+        except Exception as e:
+            self.send_response(500)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            error_response = {
                 'status': 'error',
                 'error': str(e)
-            })
-        }
+            }
+            self.wfile.write(json.dumps(error_response).encode())
+
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.end_headers()
+        return
