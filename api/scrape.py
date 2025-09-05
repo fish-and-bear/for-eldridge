@@ -561,124 +561,162 @@ class UnifiedScraper:
                 page_name = source.strip().replace('facebook.com/', '').replace('https://', '').replace('http://', '').strip('/')
                 
                 if cookies:
-                    # Try mobile Facebook with cookies
-                    url = f"https://m.facebook.com/{page_name}"
-                    
-                    # Parse cookies string into dict
+                    # Enhanced cookie handling
                     cookie_dict = {}
                     if isinstance(cookies, str):
-                        for cookie in cookies.split(';'):
-                            if '=' in cookie:
-                                key, value = cookie.strip().split('=', 1)
-                                cookie_dict[key] = value
+                        # Handle JSON format
+                        try:
+                            import json
+                            cookie_dict = json.loads(cookies)
+                        except:
+                            # Parse cookie string
+                            for cookie in cookies.split(';'):
+                                if '=' in cookie:
+                                    key, value = cookie.strip().split('=', 1)
+                                    # URL decode the value if needed
+                                    from urllib.parse import unquote
+                                    cookie_dict[key] = unquote(value)
+                    elif isinstance(cookies, dict):
+                        cookie_dict = cookies
                     
-                    headers = {
-                        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15',
-                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                        'Accept-Language': 'en-us',
-                        'Accept-Encoding': 'gzip, deflate',
-                        'Connection': 'keep-alive'
-                    }
+                    # Check if we have essential cookies
+                    has_essential = 'c_user' in cookie_dict or 'xs' in cookie_dict
                     
-                    response = requests.get(url, headers=headers, cookies=cookie_dict, timeout=15)
+                    if not has_essential:
+                        results.append({
+                            'platform': 'facebook',
+                            'page_name': page_name,
+                            'error': 'Invalid cookies - missing essential authentication cookies',
+                            'required_cookies': ['c_user', 'xs', 'datr'],
+                            'note': 'Please provide valid Facebook cookies from a logged-in session'
+                        })
+                        continue
                     
-                    if response.status_code == 200 and 'login' not in response.url.lower():
-                        # Parse basic page info from mobile site
-                        content = response.text
+                    # Try multiple Facebook endpoints
+                    endpoints = [
+                        f"https://mbasic.facebook.com/{page_name}",  # Simplest HTML
+                        f"https://m.facebook.com/{page_name}",        # Mobile
+                        f"https://www.facebook.com/{page_name}"       # Desktop
+                    ]
+                    
+                    success = False
+                    for endpoint in endpoints:
+                        headers = {
+                            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15',
+                            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                            'Accept-Language': 'en-us',
+                            'Accept-Encoding': 'gzip, deflate',
+                            'Connection': 'keep-alive',
+                            'Cache-Control': 'max-age=0'
+                        }
                         
-                        # Extract basic info using simple parsing
-                        import re
+                        response = requests.get(endpoint, headers=headers, cookies=cookie_dict, timeout=15, allow_redirects=True)
                         
-                        # Try to find page title
-                        title_match = re.search(r'<title[^>]*>([^<]+)</title>', content)
-                        page_title = title_match.group(1) if title_match else page_name
-                        
-                        # Try to find posts (basic extraction)
-                        posts = []
-                        
-                        # Look for story containers in mobile Facebook
-                        story_matches = re.findall(r'<div[^>]*story[^>]*>(.*?)</div>', content, re.DOTALL | re.IGNORECASE)
-                        
-                        for i, story in enumerate(story_matches[:5]):  # Limit to 5 posts
-                            # Extract text content (very basic)
-                            text_content = re.sub(r'<[^>]+>', ' ', story)
-                            text_content = ' '.join(text_content.split())[:300]  # Clean and limit
+                        # Check if we got a valid response
+                        if response.status_code == 200:
+                            # Check for login/checkpoint redirects
+                            if 'login' in response.url.lower() or 'checkpoint' in response.url.lower():
+                                continue  # Try next endpoint
                             
-                            if len(text_content.strip()) > 20:  # Only include substantial content
-                                posts.append({
-                                    'id': f'{page_name}_post_{i}',
-                                    'text': text_content,
-                                    'created_at': datetime.now().isoformat(),
-                                    'url': f'https://facebook.com/{page_name}',
-                                    'likes': 0,
-                                    'comments': 0,
-                                    'shares': 0
-                                })
-                        
-                        results.append({
-                            'platform': 'facebook',
-                            'page_name': page_name,
-                            'page_title': page_title,
-                            'url': f'https://facebook.com/{page_name}',
-                            'posts': posts,
-                            'posts_count': len(posts),
-                            'scraped_with': 'cookies',
-                            'note': 'Basic content extracted using mobile Facebook with cookies'
-                        })
+                            # We got valid content
+                            content = response.text
+                            
+                            # Extract data
+                            import re
+                            
+                            # Try to find page title
+                            title_match = re.search(r'<title[^>]*>([^<]+)</title>', content)
+                            page_title = title_match.group(1) if title_match else page_name
+                            
+                            # Extract posts with better patterns
+                            posts = []
+                            
+                            # Pattern for mbasic Facebook
+                            if 'mbasic' in endpoint:
+                                # mbasic has simpler structure
+                                story_divs = re.findall(r'<div[^>]*id="[^"]*"[^>]*>.*?(?:Full Story|Like|Comment).*?</div>', content, re.DOTALL)
+                            else:
+                                # Mobile/desktop patterns
+                                story_divs = re.findall(r'<div[^>]*(?:role="article"|data-sigil="story")[^>]*>.*?</div>', content, re.DOTALL)
+                            
+                            for i, story in enumerate(story_divs[:10]):  # Get up to 10 posts
+                                # Clean HTML
+                                text = re.sub(r'<[^>]+>', ' ', story)
+                                text = re.sub(r'\s+', ' ', text).strip()
+                                
+                                if len(text) > 50:
+                                    post = {
+                                        'id': f'{page_name}_post_{i}',
+                                        'text': text[:500],
+                                        'created_at': datetime.now().isoformat(),
+                                        'url': f'https://facebook.com/{page_name}'
+                                    }
+                                    
+                                    # Extract engagement if available
+                                    likes_match = re.search(r'(\d+(?:,\d+)*)\s*(?:Like|React)', story)
+                                    if likes_match:
+                                        post['likes'] = int(likes_match.group(1).replace(',', ''))
+                                    
+                                    comments_match = re.search(r'(\d+(?:,\d+)*)\s*Comment', story)
+                                    if comments_match:
+                                        post['comments'] = int(comments_match.group(1).replace(',', ''))
+                                    
+                                    posts.append(post)
+                            
+                            results.append({
+                                'platform': 'facebook',
+                                'page_name': page_name,
+                                'page_title': page_title,
+                                'url': f'https://facebook.com/{page_name}',
+                                'posts': posts,
+                                'posts_count': len(posts),
+                                'scraped_with': 'cookies',
+                                'endpoint_used': endpoint,
+                                'note': f'Scraped {len(posts)} posts using cookies'
+                            })
+                            success = True
+                            break
                     
-                    elif 'login' in response.url.lower():
+                    if not success:
+                        # All endpoints failed
                         results.append({
                             'platform': 'facebook',
                             'page_name': page_name,
-                            'error': 'Authentication failed - cookies may be expired',
-                            'note': 'Redirected to login page, please update cookies'
-                        })
-                    
-                    else:
-                        results.append({
-                            'platform': 'facebook',
-                            'page_name': page_name,
-                            'error': f'HTTP {response.status_code}: Could not access page',
-                            'note': 'Page may be private or cookies insufficient'
+                            'error': 'Authentication failed - cookies expired or account restricted',
+                            'troubleshooting': [
+                                'Cookies may have expired - get fresh cookies',
+                                'Account may be restricted or checkpoint required',
+                                'Try logging in to Facebook and completing any security checks',
+                                'Export cookies immediately after successful login'
+                            ],
+                            'cookie_status': {
+                                'c_user': 'present' if 'c_user' in cookie_dict else 'missing',
+                                'xs': 'present' if 'xs' in cookie_dict else 'missing',
+                                'datr': 'present' if 'datr' in cookie_dict else 'missing'
+                            }
                         })
                 
                 else:
-                    # No cookies provided - try basic public access
-                    url = f"https://m.facebook.com/{page_name}"
-                    headers = {
-                        'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
-                    }
-                    
-                    response = requests.get(url, headers=headers, timeout=10)
-                    
-                    if response.status_code == 200 and 'login' not in response.url.lower():
-                        results.append({
-                            'platform': 'facebook',
-                            'page_name': page_name,
-                            'url': f'https://facebook.com/{page_name}',
-                            'note': 'Page exists but limited access without authentication',
-                            'scraped_with': 'no_auth',
-                            'posts': []
-                        })
-                    else:
-                        results.append({
-                            'platform': 'facebook',
-                            'page_name': page_name,
-                            'error': 'Page requires authentication or does not exist',
-                            'note': 'Provide cookies for better access to Facebook content',
-                            'alternatives': [
-                                'Use Facebook Graph API with access token',
-                                'Provide browser cookies from logged-in session',
-                                'Use official Facebook data export tools'
-                            ]
-                        })
+                    # No cookies provided
+                    results.append({
+                        'platform': 'facebook',
+                        'page_name': page_name,
+                        'error': 'No cookies provided - Facebook requires authentication',
+                        'instructions': [
+                            '1. Log in to Facebook in your browser',
+                            '2. Open Developer Tools (F12)',
+                            '3. Go to Application/Storage > Cookies',
+                            '4. Copy c_user, xs, and datr cookie values',
+                            '5. Provide as JSON: {"c_user": "...", "xs": "...", "datr": "..."}'
+                        ]
+                    })
                 
             except Exception as e:
                 results.append({
                     'platform': 'facebook',
                     'page_name': source,
                     'error': str(e),
-                    'note': 'Facebook scraping error - try updating cookies or using Graph API'
+                    'note': 'Facebook scraping error - check cookies and try again'
                 })
         
         return results
