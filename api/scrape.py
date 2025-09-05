@@ -164,10 +164,15 @@ class UnifiedScraper:
                 # Clean subreddit name
                 subreddit = source.strip().replace('r/', '').replace('/', '')
                 
-                # Use Reddit JSON API directly
+                # Use Reddit JSON API directly with better headers for serverless
                 url = f"https://www.reddit.com/r/{subreddit}/hot.json"
                 headers = {
-                    'User-Agent': 'Mozilla/5.0 (compatible; SocialScraper/1.0)'
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'application/json, text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.5',
+                    'Accept-Encoding': 'gzip, deflate',
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
                 }
                 
                 response = requests.get(url, headers=headers, timeout=10)
