@@ -543,7 +543,8 @@ class handler(BaseHTTPRequestHandler):
             elif platform == 'instagram':
                 results = scraper.scrape_instagram(sources, {})
             elif platform == 'reddit':
-                results = scraper.scrape_reddit(sources, {})
+                options = data.get('options', {})
+                results = scraper.scrape_reddit(sources, options)
             elif platform == 'facebook':
                 cookies = data.get('cookies', '')
                 results = scraper.scrape_facebook(sources, cookies, {})
