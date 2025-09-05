@@ -158,6 +158,7 @@ class UnifiedScraper:
         from datetime import datetime
         
         results = []
+        print(f"Reddit scraping started with sources: {sources}")
         for source in sources:
             try:
                 # Clean subreddit name
@@ -368,6 +369,7 @@ class handler(BaseHTTPRequestHandler):
                 return
             
             # Route to appropriate scraper
+            print(f"Routing to platform: {platform} with sources: {sources}")
             if platform == 'twitter':
                 results = scraper.scrape_twitter(sources, '', '')
             elif platform == 'instagram':
@@ -379,6 +381,10 @@ class handler(BaseHTTPRequestHandler):
                 results = scraper.scrape_facebook(sources, cookies, {})
             else:
                 results = [{'error': f'Unsupported platform: {platform}'}]
+            
+            print(f"Scraping completed. Results count: {len(results)}")
+            if results:
+                print(f"First result: {results[0]}")
             
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
