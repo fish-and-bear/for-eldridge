@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Social Media Scraper</title>
+    <style>
+        :root {
+            --primary: #000;
+            --secondary: #666;
+            --background: #fff;
+            --surface: #f7f7f7;
+            --border: #e0e0e0;
+            --hover: #f0f0f0;
+            --success: #0a7e0a;
+            --error: #d32f2f;
+            --warning: #f57c00;
+            --radius: 6px;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica', 'Arial', sans-serif;
+            line-height: 1.6;
+            color: var(--primary);
+            background: var(--background);
+            padding: 0;
+            margin: 0;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 0 24px;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 8px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 32px;
+        }
+        
+        .tab {
+            position: relative;
+            padding: 12px 20px;
+            background: none;
+            border: none;
+            color: var(--secondary);
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .tab:hover {
+            color: var(--primary);
+            background: var(--hover);
+        }
+        
+        .tab.active {
+            color: var(--primary);
+        }
+        
+        .tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--primary);
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+        
+        .badge.no-auth {
+            background: #e8f5e9;
+            color: var(--success);
+        }
+        
+        .badge.auth-req {
+            background: #ffebee;
+            color: var(--error);
+        }
+        
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .form-group {
+            margin-bottom: 24px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            font-size: 14px;
+            color: var(--primary);
+        }
+        
+        input[type="text"],
+        input[type="date"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 14px;
+            font-family: inherit;
+            transition: all 0.2s;
+            background: var(--background);
+        }
+        
+        input[type="text"]:focus,
+        input[type="date"]:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(0,0,0,0.05);
+        }
+        
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+        
+        .input-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            font-weight: normal;
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .checkbox-label input[type="checkbox"] {
+            width: auto;
+            margin-right: 8px;
+        }
+        
+        .btn {
+            padding: 10px 24px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: var(--radius);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .btn-secondary {
+            background: var(--surface);
+            color: var(--primary);
+            border: 1px solid var(--border);
+        }
+        
+        .btn-secondary:hover {
+            background: var(--hover);
+        }
+        
+        .help-toggle {
+            display: inline-block;
+            padding: 4px 8px;
+            background: var(--surface);
+            border-radius: 3px;
+            color: var(--secondary);
+            font-size: 12px;
+            cursor: pointer;
+            user-select: none;
+            margin-bottom: 12px;
+            transition: all 0.2s;
+        }
+        
+        .help-toggle:hover {
+            background: var(--hover);
+            color: var(--primary);
+        }
+        
+        .help-content {
+            display: none;
+            background: var(--surface);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        
+        .help-content.active {
+            display: block;
+        }
+        
+        .help-content h4 {
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+        
+        .help-content ol,
+        .help-content ul {
+            margin-left: 20px;
+            line-height: 1.8;
+        }
+        
+        .help-content code {
+            background: var(--hover);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+        
+        .help-content pre {
+            background: var(--primary);
+            color: white;
+            padding: 12px;
+            border-radius: var(--radius);
+            overflow-x: auto;
+            margin: 12px 0;
+            font-size: 12px;
+        }
+        
+        .alert {
+            padding: 12px 16px;
+            border-radius: var(--radius);
+            margin-bottom: 16px;
+            font-size: 13px;
+        }
+        
+        .alert.warning {
+            background: #fff3e0;
+            color: var(--warning);
+            border-left: 3px solid var(--warning);
+        }
+        
+        .alert.error {
+            background: #ffebee;
+            color: var(--error);
+            border-left: 3px solid var(--error);
+        }
+        
+        .alert.info {
+            background: #e3f2fd;
+            color: #1976d2;
+            border-left: 3px solid #1976d2;
+        }
+        
+        #results {
+            margin-top: 40px;
+            padding-top: 32px;
+            border-top: 1px solid var(--border);
+        }
+        
+        .result-item {
+            background: var(--background);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-bottom: 16px;
+            transition: all 0.2s;
+        }
+        
+        .result-item:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        
+        .result-content {
+            font-size: 15px;
+            line-height: 1.5;
+            margin-bottom: 12px;
+            color: var(--primary);
+        }
+        
+        .result-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            font-size: 13px;
+            color: var(--secondary);
+        }
+        
+        .result-meta span {
+            display: flex;
+            align-items: center;
+        }
+        
+        .comments-section {
+            margin-top: 16px;
+            padding-left: 20px;
+            border-left: 2px solid var(--border);
+        }
+        
+        .comments-toggle {
+            cursor: pointer;
+            color: var(--secondary);
+            font-size: 13px;
+            margin-bottom: 12px;
+        }
+        
+        .comments-toggle:hover {
+            color: var(--primary);
+        }
+        
+        .comment {
+            padding: 12px 0;
+            border-bottom: 1px solid var(--hover);
+        }
+        
+        .comment:last-child {
+            border-bottom: none;
+        }
+        
+        .comment-author {
+            font-weight: 500;
+            color: var(--primary);
+            margin-bottom: 4px;
+        }
+        
+        .comment-text {
+            color: var(--secondary);
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+        
+        .comment-meta {
+            font-size: 12px;
+            color: var(--secondary);
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 48px;
+            color: var(--secondary);
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 32px;
+            height: 32px;
+            border: 3px solid var(--border);
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 16px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .export-section {
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('reddit')">
+                Reddit
+                <span class="badge no-auth">NO AUTH</span>
+            </button>
+            <button class="tab" onclick="switchTab('twitter')">
+                Twitter
+                <span class="badge no-auth">NO AUTH</span>
+            </button>
+            <button class="tab" onclick="switchTab('instagram')">
+                Instagram
+                <span class="badge no-auth">NO AUTH</span>
+            </button>
+            <button class="tab" onclick="switchTab('facebook')">
+                Facebook
+                <span class="badge auth-req">COOKIES</span>
+            </button>
+        </div>
+        
+        <!-- Reddit Tab -->
+        <div id="reddit-tab" class="tab-content active">
+            <div class="help-toggle" onclick="toggleHelp('reddit')">View input formats</div>
+            <div id="reddit-help" class="help-content">
+                <h4>Supported formats:</h4>
+                <ul>
+                    <li>Subreddits: r/technology, r/science</li>
+                    <li>Users: u/spez, u/GallowBoob</li>
+                    <li>Direct URLs: reddit.com/r/AskReddit/comments/...</li>
+                </ul>
+            </div>
+            
+            <div class="form-group">
+                <label>Sources</label>
+                <textarea id="reddit-sources" placeholder="Enter subreddits, users, or URLs (one per line)
+
+r/technology
+u/spez
+reddit.com/r/AskReddit/comments/...">r/technology</textarea>
+            </div>
+            
+            <div class="input-row">
+                <div class="form-group">
+                    <label>Date From</label>
+                    <input type="date" id="reddit-date-from">
+                </div>
+                <div class="form-group">
+                    <label>Date To</label>
+                    <input type="date" id="reddit-date-to">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Keywords (comma-separated)</label>
+                <input type="text" id="reddit-keywords" placeholder="AI, technology, innovation">
+            </div>
+            
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="reddit-fetch-comments" checked>
+                    Fetch all comments for each post (comprehensive but slower)
+                </label>
+            </div>
+            
+            <button class="btn" onclick="scrapeReddit()">Scrape Reddit</button>
+        </div>
+        
+        <!-- Twitter Tab -->
+        <div id="twitter-tab" class="tab-content">
+            <div class="help-toggle" onclick="toggleHelp('twitter')">View input formats</div>
+            <div id="twitter-help" class="help-content">
+                <h4>Supported formats:</h4>
+                <ul>
+                    <li>Usernames: @elonmusk, @OpenAI</li>
+                    <li>Direct URLs: twitter.com/NASA/status/...</li>
+                    <li>Multiple accounts supported (one per line)</li>
+                </ul>
+            </div>
+            
+            <div class="form-group">
+                <label>Usernames or URLs</label>
+                <textarea id="twitter-sources" placeholder="Enter usernames or URLs (one per line)
+
+@elonmusk
+@OpenAI
+twitter.com/NASA/status/...">@elonmusk</textarea>
+            </div>
+            
+            <div class="form-group">
+                <label class="checkbox-label" style="display: flex; align-items: center; gap: 12px; padding: 12px; background: linear-gradient(135deg, rgba(29, 161, 242, 0.08), rgba(29, 161, 242, 0.02)); border-radius: 8px; border: 1px solid rgba(29, 161, 242, 0.2); cursor: pointer;">
+                    <input type="checkbox" id="twitter-include-comments" style="margin: 0;">
+                    <div>
+                        <div style="font-weight: 500; color: var(--primary);">Analyze Threads & Conversations</div>
+                        <div style="font-size: 12px; color: var(--secondary); margin-top: 4px;">
+                            Intelligently detects thread continuations, maps conversation flow, and identifies reply chains within user's timeline
+                        </div>
+                    </div>
+                </label>
+            </div>
+            
+            <div class="input-row">
+                <div class="form-group">
+                    <label>Date From</label>
+                    <input type="date" id="twitter-date-from">
+                </div>
+                <div class="form-group">
+                    <label>Date To</label>
+                    <input type="date" id="twitter-date-to">
+                </div>
+            </div>
+            
+            <button class="btn" onclick="scrapeTwitter()">Scrape Twitter</button>
+        </div>
+        
+        <!-- Instagram Tab -->
+        <div id="instagram-tab" class="tab-content">
+            <div class="help-toggle" onclick="toggleHelp('instagram')">View input formats</div>
+            <div id="instagram-help" class="help-content">
+                <h4>Supported formats:</h4>
+                <ul>
+                    <li>Usernames: cristiano, therock, kimkardashian</li>
+                    <li>No @ symbol needed</li>
+                    <li>Fetches profile info and recent posts</li>
+                </ul>
+            </div>
+            
+            <div class="form-group">
+                <label>Usernames</label>
+                <textarea id="instagram-sources" placeholder="Enter usernames (one per line)
+
+cristiano
+therock
+kimkardashian">cristiano</textarea>
+            </div>
+            
+            <button class="btn" onclick="scrapeInstagram()">Scrape Instagram</button>
+        </div>
+        
+        <!-- Facebook Tab -->
+        <div id="facebook-tab" class="tab-content">
+            <div class="alert warning">
+                <strong>Authentication Required:</strong> Facebook requires valid cookies to access posts and comments.
+            </div>
+            
+            <div class="help-toggle" onclick="toggleHelp('facebook')">How to get cookies</div>
+            <div id="facebook-help" class="help-content">
+                <h4>Getting Facebook Cookies:</h4>
+                <ol>
+                    <li>Log into Facebook in your browser</li>
+                    <li>Open Developer Tools (F12 or right-click → Inspect)</li>
+                    <li>Go to Application/Storage → Cookies</li>
+                    <li>Find and copy: c_user, xs, and datr values</li>
+                </ol>
+                
+                <h4>Cookie Format:</h4>
+                <pre>{
+  "c_user": "your_user_id",
+  "xs": "your_xs_token",
+  "datr": "your_datr_token"
+}</pre>
+            </div>
+            
+            <div class="form-group">
+                <label>Cookies (JSON format)</label>
+                <textarea id="fb-cookies" placeholder='Paste your cookies in JSON format'></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label>Pages or Groups</label>
+                <textarea id="fb-sources" placeholder="Enter page names or URLs (one per line)
+
+facebook
+Meta
+facebook.com/Google">facebook</textarea>
+            </div>
+            
+            <div class="input-row">
+                <div class="form-group">
+                    <label>Date From</label>
+                    <input type="date" id="fb-date-from">
+                </div>
+                <div class="form-group">
+                    <label>Date To</label>
+                    <input type="date" id="fb-date-to">
+                </div>
+            </div>
+            
+            <button class="btn" onclick="scrapeFacebook()">Scrape Facebook</button>
+        </div>
+        
+        <!-- Results Section -->
+        <div id="results"></div>
+    </div>
+    
+    <script>
+        // Store current results for export
+        let currentResults = [];
+        
+        function switchTab(platform) {
+            // Update active tab
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Update active content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(`${platform}-tab`).classList.add('active');
+        }
+        
+        function toggleHelp(platform) {
+            const helpContent = document.getElementById(`${platform}-help`);
+            helpContent.classList.toggle('active');
+        }
+        
+        async function scrapeReddit() {
+            const sources = document.getElementById('reddit-sources').value
+                .split('\n')
+                .filter(s => s.trim())
+                .map(s => s.trim());
+            const dateFrom = document.getElementById('reddit-date-from').value;
+            const dateTo = document.getElementById('reddit-date-to').value;
+            const keywords = document.getElementById('reddit-keywords').value
+                .split(',')
+                .filter(k => k.trim())
+                .map(k => k.trim());
+            
+            if (!sources.length) {
+                alert('Please enter at least one source');
+                return;
+            }
+            
+            showLoading();
+            
+            const options = {};
+            if (dateFrom) options.date_from = dateFrom;
+            if (dateTo) options.date_to = dateTo;
+            if (keywords.length) options.keywords = keywords;
+            
+            // Add fetch_comments option
+            const fetchComments = document.getElementById('reddit-fetch-comments').checked;
+            options.fetch_comments = fetchComments;
+            
+            try {
+                const response = await fetch('/api/scrape', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        platform: 'reddit',
+                        sources: sources,
+                        options: options
+                    })
+                });
+                
+                const data = await response.json();
+                displayResults(data);
+            } catch (error) {
+                displayError(error.message);
+            }
+        }
+        
+        async function scrapeTwitter() {
+            const sources = document.getElementById('twitter-sources').value
+                .split('\n')
+                .filter(s => s.trim())
+                .map(s => s.trim());
+            const dateFrom = document.getElementById('twitter-date-from').value;
+            const dateTo = document.getElementById('twitter-date-to').value;
+            
+            if (!sources.length) {
+                alert('Please enter at least one username or URL');
+                return;
+            }
+            
+            showLoading();
+            
+            const options = {};
+            if (dateFrom) options.date_from = dateFrom;
+            if (dateTo) options.date_to = dateTo;
+            
+            const includeComments = document.getElementById('twitter-include-comments').checked;
+            if (includeComments) options.include_comments = true;
+            
+            try {
+                const response = await fetch('/api/scrape', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        platform: 'twitter',
+                        sources: sources,
+                        options: options
+                    })
+                });
+                
+                const data = await response.json();
+                displayResults(data);
+            } catch (error) {
+                displayError(error.message);
+            }
+        }
+        
+        async function scrapeInstagram() {
+            const sources = document.getElementById('instagram-sources').value
+                .split('\n')
+                .filter(s => s.trim())
+                .map(s => s.trim().replace('@', ''));
+            
+            if (!sources.length) {
+                alert('Please enter at least one username');
+                return;
+            }
+            
+            showLoading();
+            
+            try {
+                const response = await fetch('/api/scrape', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        platform: 'instagram',
+                        sources: sources,
+                        options: {}
+                    })
+                });
+                
+                const data = await response.json();
+                displayResults(data);
+            } catch (error) {
+                displayError(error.message);
+            }
+        }
+        
+        async function scrapeFacebook() {
+            const cookies = document.getElementById('fb-cookies').value;
+            const sources = document.getElementById('fb-sources').value
+                .split('\n')
+                .filter(s => s.trim())
+                .map(s => s.trim());
+            const dateFrom = document.getElementById('fb-date-from').value;
+            const dateTo = document.getElementById('fb-date-to').value;
+            
+            if (!sources.length) {
+                alert('Please enter at least one page or group');
+                return;
+            }
+            
+            showLoading();
+            
+            const options = {cookies: cookies};
+            if (dateFrom) options.date_from = dateFrom;
+            if (dateTo) options.date_to = dateTo;
+            
+            try {
+                const response = await fetch('/api/scrape', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        platform: 'facebook',
+                        sources: sources,
+                        options: options
+                    })
+                });
+                
+                const data = await response.json();
+                displayResults(data);
+            } catch (error) {
+                displayError(error.message);
+            }
+        }
+        
+        function showLoading() {
+            document.getElementById('results').innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <div>Scraping data...</div>
+                </div>
+            `;
+        }
+        
+        function renderComments(comments, level = 0) {
+            if (!comments || comments.length === 0) return '';
+            
+            return comments.map(comment => {
+                const indent = level * 20;
+                const bgColor = level % 2 === 0 ? 'var(--surface)' : 'var(--background)';
+                
+                // Handle both Reddit's nested format and flat format
+                const author = comment.author || comment.username || '[deleted]';
+                const text = comment.text || comment.body || comment.content || '[removed]';
+                const score = comment.score || comment.likes || 0;
+                const timestamp = comment.created_at || comment.time || '';
+                const isOP = comment.is_submitter || false;
+                const isMod = comment.distinguished === 'moderator';
+                const isAdmin = comment.distinguished === 'admin';
+                
+                let authorBadge = '';
+                if (isOP) authorBadge = '<span style="background: #007bff; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; margin-left: 8px;">OP</span>';
+                if (isMod) authorBadge = '<span style="background: #28a745; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; margin-left: 8px;">MOD</span>';
+                if (isAdmin) authorBadge = '<span style="background: #dc3545; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; margin-left: 8px;">ADMIN</span>';
+                
+                return `
+                    <div style="margin-left: ${indent}px; padding: 12px; background: ${bgColor}; border-left: 2px solid var(--border); margin-bottom: 8px;">
+                        <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                            <strong style="color: var(--primary);">${author}</strong>
+                            ${authorBadge}
+                            <span style="margin-left: auto; font-size: 12px; color: var(--secondary);">
+                                Score: ${score.toLocaleString()}
+                                ${comment.awards ? ` • Awards: ${comment.awards}` : ''}
+                                ${comment.edited ? ' • (edited)' : ''}
+                            </span>
+                        </div>
+                        <div style="color: var(--primary); line-height: 1.5; white-space: pre-wrap;">${text}</div>
+                        ${timestamp ? `<div style="font-size: 11px; color: var(--secondary); margin-top: 8px;">${new Date(timestamp).toLocaleString()}</div>` : ''}
+                        ${comment.replies && comment.replies.length > 0 ? `
+                            <div style="margin-top: 12px;">
+                                ${renderComments(comment.replies, level + 1)}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function displayResults(data) {
+            const resultsDiv = document.getElementById('results');
+            
+            if (data.error) {
+                resultsDiv.innerHTML = `
+                    <div class="alert error">
+                        <strong>Error:</strong> ${data.error}
+                    </div>
+                `;
+                return;
+            }
+            
+            if (!data.results || data.results.length === 0) {
+                resultsDiv.innerHTML = `
+                    <div class="alert info">
+                        No results found. Try adjusting your search parameters.
+                    </div>
+                `;
+                return;
+            }
+            
+            currentResults = data.results;
+            
+            let html = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                    <h3 style="margin: 0;">Results (${data.count || data.results.length} items)</h3>
+                    <div style="display: flex; gap: 12px;">
+                        <button class="btn btn-secondary" onclick="exportJSON()">Export as JSON</button>
+                        <button class="btn btn-secondary" onclick="exportCSV()">Export as CSV</button>
+                    </div>
+                </div>
+            `;
+            
+            data.results.forEach(item => {
+                const content = item.title || item.text || item.content || item.biography || 'No content';
+                const date = item.created_at || item.time || '';
+                
+                let engagementHtml = '';
+                let threadBadge = '';
+                let replyContext = '';
+                
+                if (item.platform === 'twitter') {
+                    // Basic engagement metrics
+                    engagementHtml = `
+                        ${item.likes ? `<span>Likes: ${item.likes.toLocaleString()}</span>` : ''}
+                        ${item.retweets ? `<span>Retweets: ${item.retweets.toLocaleString()}</span>` : ''}
+                        ${item.replies ? `<span>Replies: ${item.replies.toLocaleString()}</span>` : ''}
+                    `;
+                    
+                    // Thread/conversation indicators
+                    if (item.conversation_stats) {
+                        const stats = item.conversation_stats;
+                        if (stats.total_in_conversation > 1 || stats.has_replies) {
+                            threadBadge = `
+                                <span style="background: linear-gradient(135deg, #1DA1F2, #14c7ff); 
+                                           color: white; padding: 3px 8px; border-radius: 12px; 
+                                           font-size: 11px; font-weight: 500; margin-left: 8px;">
+                                    Thread (${stats.total_in_conversation} tweets)
+                                </span>
+                            `;
+                        }
+                    }
+                    
+                    // Reply context indicator
+                    if (item.is_reply && item.reply_to_user) {
+                        replyContext = `
+                            <div style="font-size: 12px; color: #657786; margin-bottom: 8px; 
+                                      padding: 8px 12px; background: rgba(101, 119, 134, 0.05); 
+                                      border-radius: 8px; border-left: 3px solid #657786;">
+                                ↳ Replying to @${item.reply_to_user}
+                            </div>
+                        `;
+                    }
+                } else if (item.platform === 'instagram') {
+                    if (item.type === 'profile') {
+                        engagementHtml = `
+                            <span>Followers: ${(item.followers || 0).toLocaleString()}</span>
+                            <span>Following: ${(item.following || 0).toLocaleString()}</span>
+                            <span>Posts: ${(item.posts_count || 0).toLocaleString()}</span>
+                        `;
+                    } else {
+                        engagementHtml = `
+                            ${item.likes ? `<span>Likes: ${item.likes.toLocaleString()}</span>` : ''}
+                            ${item.comments ? `<span>Comments: ${item.comments.toLocaleString()}</span>` : ''}
+                        `;
+                    }
+                } else if (item.platform === 'reddit' && item.engagement) {
+                    engagementHtml = `
+                        <span>Score: ${(item.engagement.score || 0).toLocaleString()}</span>
+                        <span>Comments: ${(item.engagement.comments || 0).toLocaleString()}</span>
+                        ${item.engagement.upvote_ratio ? `<span>Upvote ratio: ${Math.round(item.engagement.upvote_ratio * 100)}%</span>` : ''}
+                    `;
+                }
+                
+                // Beautiful thread continuation for Twitter
+                let threadContinuation = '';
+                if (item.platform === 'twitter' && item.reply_chain && item.reply_chain.length > 0) {
+                    threadContinuation = `
+                        <div style="margin-top: 20px; padding: 0;">
+                            <div style="display: flex; align-items: center; margin-bottom: 16px;">
+                                <div style="flex: 1; height: 1px; background: linear-gradient(90deg, transparent, #1DA1F2 20%, #1DA1F2 80%, transparent);"></div>
+                                <span style="padding: 0 16px; font-size: 11px; color: #1DA1F2; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Thread Continuation</span>
+                                <div style="flex: 1; height: 1px; background: linear-gradient(90deg, transparent, #1DA1F2 20%, #1DA1F2 80%, transparent);"></div>
+                            </div>
+                            <div style="position: relative; padding-left: 24px;">
+                                <div style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: linear-gradient(180deg, #1DA1F2, rgba(29, 161, 242, 0.3));"></div>
+                                ${item.reply_chain.map((reply, idx) => `
+                                    <div style="position: relative; margin-bottom: 16px;">
+                                        <div style="position: absolute; left: -25px; top: 12px; width: 10px; height: 10px; 
+                                                  background: #1DA1F2; border-radius: 50%; 
+                                                  box-shadow: 0 0 0 3px var(--bg), 0 2px 4px rgba(29, 161, 242, 0.3);"></div>
+                                        <div style="background: linear-gradient(135deg, rgba(29, 161, 242, 0.08), rgba(29, 161, 242, 0.02)); 
+                                                  padding: 14px; border-radius: 12px; 
+                                                  border: 1px solid rgba(29, 161, 242, 0.15);
+                                                  transition: all 0.2s ease;">
+                                            <div style="color: var(--primary); line-height: 1.6; margin-bottom: 8px;">${reply.text}</div>
+                                            <div style="display: flex; align-items: center; gap: 12px; font-size: 11px; color: var(--secondary);">
+                                                ${reply.created_at ? `<span>${new Date(reply.created_at).toLocaleString()}</span>` : ''}
+                                                ${reply.likes ? `<span>♥ ${reply.likes.toLocaleString()}</span>` : ''}
+                                                <span style="margin-left: auto; color: #1DA1F2; font-weight: 500;">@${item.author}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                html += `
+                    <div class="result-item">
+                        ${replyContext}
+                        <div style="display: flex; align-items: flex-start; justify-content: space-between;">
+                            <div class="result-content" style="flex: 1;">${content}</div>
+                            ${threadBadge}
+                        </div>
+                        <div class="result-meta">
+                            <span>Author: ${item.author || item.username || 'Unknown'}</span>
+                            ${date ? `<span>Date: ${new Date(date).toLocaleDateString()}</span>` : ''}
+                            ${engagementHtml}
+                        </div>
+                        ${threadContinuation}
+                        ${item.comments && item.comments.length > 0 ? `
+                            <div class="comments-section">
+                                <details open>
+                                    <summary class="comments-toggle">
+                                        ${item.comments.length} comment${item.comments.length !== 1 ? 's' : ''}
+                                    </summary>
+                                    <div>
+                                        ${renderComments(item.comments)}
+                                    </div>
+                                </details>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            });
+            
+            resultsDiv.innerHTML = html;
+        }
+        
+        function displayError(message) {
+            document.getElementById('results').innerHTML = `
+                <div class="alert error">
+                    <strong>Error:</strong> ${message}
+                </div>
+            `;
+        }
+        
+        function exportJSON() {
+            // Organize data with full structure including replies/comments
+            const organizedData = {
+                metadata: {
+                    exported_at: new Date().toISOString(),
+                    total_items: currentResults.length,
+                    platforms: [...new Set(currentResults.map(item => item.platform))]
+                },
+                data: currentResults.map(item => {
+                    // Ensure all nested data is included
+                    const organized = { ...item };
+                    
+                    // Organize Reddit comments
+                    if (item.comments && item.comments.length > 0) {
+                        organized.comments = organizeComments(item.comments);
+                    }
+                    
+                    // Organize Twitter reply chains
+                    if (item.reply_chain && item.reply_chain.length > 0) {
+                        organized.reply_chain = item.reply_chain;
+                    }
+                    
+                    return organized;
+                })
+            };
+            
+            const dataStr = JSON.stringify(organizedData, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `scrape_${Date.now()}.json`;
+            link.click();
+        }
+        
+        function organizeComments(comments, parentId = null) {
+            // Recursively organize nested comments
+            return comments.map(comment => ({
+                ...comment,
+                replies: comment.replies ? organizeComments(comment.replies, comment.id) : []
+            }));
+        }
+        
+        function exportCSV() {
+            if (!currentResults.length) return;
+            
+            // Flatten data for CSV export including nested content
+            const flatData = [];
+            
+            currentResults.forEach(item => {
+                // Main item
+                const mainRow = { ...item };
+                
+                // Convert nested objects to strings
+                if (mainRow.engagement) mainRow.engagement = JSON.stringify(mainRow.engagement);
+                if (mainRow.media) mainRow.media = JSON.stringify(mainRow.media);
+                if (mainRow.conversation_stats) mainRow.conversation_stats = JSON.stringify(mainRow.conversation_stats);
+                
+                // Add main item
+                flatData.push({
+                    ...mainRow,
+                    type: 'main_post',
+                    parent_id: null,
+                    comment_depth: 0
+                });
+                
+                // Add Twitter reply chains
+                if (item.reply_chain && item.reply_chain.length > 0) {
+                    item.reply_chain.forEach((reply, idx) => {
+                        flatData.push({
+                            platform: item.platform,
+                            type: 'thread_reply',
+                            parent_id: item.id || item.url,
+                            author: reply.author || item.author,
+                            text: reply.text,
+                            created_at: reply.created_at,
+                            likes: reply.likes,
+                            thread_position: idx + 1,
+                            original_post: item.text ? item.text.substring(0, 50) + '...' : ''
+                        });
+                    });
+                }
+                
+                // Add Reddit comments (flattened)
+                if (item.comments && item.comments.length > 0) {
+                    const flatComments = flattenComments(item.comments, item.id || item.url);
+                    flatData.push(...flatComments);
+                }
+                
+                // Add Instagram post data with full engagement
+                if (item.platform === 'instagram') {
+                    // Instagram posts often have additional engagement data
+                    if (item.type === 'post' && item.comments_count) {
+                        flatData.push({
+                            platform: 'instagram',
+                            type: 'engagement_summary',
+                            parent_id: item.id || item.url,
+                            author: item.author || item.username,
+                            likes_count: item.likes,
+                            comments_count: item.comments || item.comments_count,
+                            is_video: item.is_video,
+                            media_urls: JSON.stringify(item.media || []),
+                            caption: item.text || item.caption
+                        });
+                    }
+                }
+                
+                // Add Facebook data with reactions and comments
+                if (item.platform === 'facebook') {
+                    // Facebook reactions breakdown
+                    if (item.reactions && typeof item.reactions === 'object') {
+                        flatData.push({
+                            platform: 'facebook',
+                            type: 'reactions_breakdown',
+                            parent_id: item.id || item.post_url,
+                            total_likes: item.likes,
+                            total_comments: item.comments,
+                            total_shares: item.shares,
+                            reactions_detail: JSON.stringify(item.reactions),
+                            images: JSON.stringify(item.images || [])
+                        });
+                    }
+                    
+                    // If Facebook has comment data
+                    if (item.comments_full && Array.isArray(item.comments_full)) {
+                        item.comments_full.forEach(comment => {
+                            flatData.push({
+                                platform: 'facebook',
+                                type: 'comment',
+                                parent_id: item.id || item.post_url,
+                                comment_author: comment.author,
+                                comment_text: comment.text,
+                                comment_time: comment.time,
+                                comment_likes: comment.likes || 0
+                            });
+                        });
+                    }
+                }
+            });
+            
+            // Get all unique keys
+            const keys = new Set();
+            flatData.forEach(item => {
+                Object.keys(item).forEach(key => keys.add(key));
+            });
+            const headers = Array.from(keys).sort();
+            
+            // Create CSV content with proper escaping
+            let csv = headers.map(h => `"${h}"`).join(',') + '\n';
+            
+            flatData.forEach(item => {
+                const row = headers.map(header => {
+                    const value = item[header];
+                    if (value === null || value === undefined) return '""';
+                    if (typeof value === 'object') return `"${JSON.stringify(value).replace(/"/g, '""')}"`;
+                    const strValue = String(value).replace(/"/g, '""').replace(/\n/g, ' ').replace(/\r/g, '');
+                    return `"${strValue}"`;
+                });
+                csv += row.join(',') + '\n';
+            });
+            
+            const dataBlob = new Blob([csv], {type: 'text/csv'});
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `scrape_${Date.now()}.csv`;
+            link.click();
+        }
+        
+        function flattenComments(comments, parentPostId, depth = 0) {
+            const flat = [];
+            comments.forEach(comment => {
+                // Add the comment itself
+                flat.push({
+                    platform: 'reddit',
+                    type: comment.type === 'more_comments' ? 'more_comments_indicator' : 'comment',
+                    parent_post_id: parentPostId,
+                    comment_id: comment.id,
+                    parent_comment_id: comment.parent_id || null,
+                    author: comment.author,
+                    text: comment.text || comment.body || '',
+                    score: comment.score,
+                    created_at: comment.created_at,
+                    edited: comment.edited,
+                    depth: comment.depth !== undefined ? comment.depth : depth,
+                    is_submitter: comment.is_submitter,
+                    distinguished: comment.distinguished,
+                    awards: comment.awards,
+                    controversiality: comment.controversiality,
+                    permalink: comment.permalink,
+                    is_deleted: comment.is_deleted
+                });
+                
+                // Recursively add replies
+                if (comment.replies && comment.replies.length > 0) {
+                    flat.push(...flattenComments(comment.replies, parentPostId, depth + 1));
+                }
+            });
+            return flat;
+        }
+    </script>
+</body>
+</html>
