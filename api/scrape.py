@@ -160,7 +160,6 @@ class UnifiedScraper:
         import random
         
         results = []
-        print(f"Reddit scraping started with sources: {sources}")
         
         for source in sources:
             try:
@@ -170,7 +169,6 @@ class UnifiedScraper:
                 
                 # Strategy 1: Arctic Shift API (Best for serverless) - PRIORITY
                 try:
-                    print(f"Trying Arctic Shift API for r/{subreddit}")
                     
                     arctic_url = "https://arctic-shift.photon-reddit.com/api/posts/search"
                     params = {
@@ -190,7 +188,6 @@ class UnifiedScraper:
                         posts = data.get('data', [])
                         
                         if posts:
-                            print(f"Arctic Shift success: Found {len(posts)} posts")
                             
                             for post in posts[:10]:
                                 post_data = {
@@ -217,7 +214,6 @@ class UnifiedScraper:
                                     try:
                                         post_id = post.get('id')
                                         if post_id:
-                                            print(f"Fetching comments for post {post_id}")
                                             comments_url = "https://arctic-shift.photon-reddit.com/api/comments/search"
                                             comments_params = {
                                                 'link_id': f't3_{post_id}',
@@ -241,25 +237,21 @@ class UnifiedScraper:
                                                 
                                                 post_data['comments'] = comment_list
                                                 post_data['comments_fetched'] = len(comment_list)
-                                                print(f"Fetched {len(comment_list)} comments for post {post_id}")
                                             else:
-                                                print(f"Comments fetch failed for post {post_id}: {comments_response.status_code}")
+                                                pass  # Comments fetch failed
                                     except Exception as comment_error:
-                                        print(f"Error fetching comments: {comment_error}")
                                         post_data['comment_fetch_error'] = str(comment_error)
                                 
                                 results.append(post_data)
                             
                             success = True
-                            print(f"✅ Arctic Shift API SUCCESS: Found {len(results)} posts")
                             
                 except Exception as arctic_error:
-                    print(f"Arctic Shift API error: {arctic_error}")
+                    pass  # Arctic Shift API failed
                 
                 # Strategy 2: RSS Feed Fallback (More reliable for serverless)
                 if not success:
                     try:
-                        print(f"Trying RSS feed for r/{subreddit}")
                         
                         rss_url = f"https://www.reddit.com/r/{subreddit}.rss"
                         headers = {
@@ -277,7 +269,6 @@ class UnifiedScraper:
                             entries = root.findall('.//{http://www.w3.org/2005/Atom}entry')
                             
                             if entries:
-                                print(f"RSS feed success: Found {len(entries)} entries")
                                 
                                 for entry in entries[:10]:
                                     title_elem = entry.find('.//{http://www.w3.org/2005/Atom}title')
@@ -310,12 +301,11 @@ class UnifiedScraper:
                                 success = True
                                 
                     except Exception as rss_error:
-                        print(f"RSS feed error: {rss_error}")
+                        pass  # RSS feed failed
                 
                 # Strategy 3: JSON API fallback (less reliable in serverless)
                 if not success:
                     try:
-                        print(f"Trying JSON API for r/{subreddit}")
                         
                         json_url = f"https://old.reddit.com/r/{subreddit}/hot.json?limit=10"
                         headers = {
@@ -355,7 +345,7 @@ class UnifiedScraper:
                                 success = True
                                 
                     except Exception as json_error:
-                        print(f"JSON API error: {json_error}")
+                        pass  # JSON API failed
                 
                 # If all strategies failed
                 if not success:
@@ -375,7 +365,6 @@ class UnifiedScraper:
                     'error': f'Unexpected error: {str(e)}'
                 })
         
-        print(f"Reddit scraping completed. Total results: {len(results)}")
         return results
     
     def scrape_facebook(self, sources, cookies, options):
