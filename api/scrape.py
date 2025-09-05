@@ -33,6 +33,12 @@ try:
 except ImportError:
     XCANCEL_CF_AVAILABLE = False
 
+try:
+    from ntscraper_twitter import NTScraperTwitter
+    NTSCRAPER_AVAILABLE = True
+except ImportError:
+    NTSCRAPER_AVAILABLE = False
+
 class UnifiedScraper:
     def __init__(self):
         if SCRAPERS_AVAILABLE:
@@ -61,6 +67,12 @@ class UnifiedScraper:
             self.xcancel_cf = XCancelCloudflare()
         else:
             self.xcancel_cf = None
+        
+        # Initialize ntscraper if available
+        if NTSCRAPER_AVAILABLE:
+            self.ntscraper = NTScraperTwitter()
+        else:
+            self.ntscraper = None
     
     def scrape_twitter(self, sources, bearer_token, cookies, options=None):
         results = []
@@ -114,8 +126,30 @@ class UnifiedScraper:
             username = source.strip().replace('@', '')
             tweets_found = False
             
-            # Strategy 1: Try enhanced scraper first for more complete timeline
-            if self.enhanced_twitter:
+            # Strategy 1: Try ntscraper first (uses working nitter instances)
+            if not tweets_found and self.ntscraper:
+                try:
+                    tweets = self.ntscraper.scrape_user_timeline(username, limit=50)
+                    if tweets and not any('error' in tweet for tweet in tweets):
+                        for tweet in tweets:
+                            results.append({
+                                'platform': 'twitter',
+                                'username': f'@{username}',
+                                'text': tweet.get('text', ''),
+                                'created_at': tweet.get('created_at', ''),
+                                'likes': tweet.get('likes', 0),
+                                'retweets': tweet.get('retweets', 0),
+                                'replies': tweet.get('replies', 0),
+                                'url': tweet.get('url', ''),
+                                'media': tweet.get('media', []),
+                                'source': 'ntscraper_nitter'
+                            })
+                        tweets_found = True
+                except Exception:
+                    pass
+            
+            # Strategy 2: Try enhanced scraper for more complete timeline
+            if not tweets_found and self.enhanced_twitter:
                 try:
                     tweets = self.enhanced_twitter.scrape_user_timeline(username, limit=50)
                     if tweets and not any('error' in tweet for tweet in tweets):
