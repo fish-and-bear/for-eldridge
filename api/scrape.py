@@ -168,120 +168,163 @@ class UnifiedScraper:
                 subreddit = source.strip().replace('r/', '').replace('/', '')
                 success = False
                 
-                # Multiple fallback strategies for Reddit - optimized for serverless
-                strategies = [
-                    # Strategy 1: Old Reddit - most reliable for serverless
-                    {
-                        'url': f"https://old.reddit.com/r/{subreddit}/hot.json?limit=10",
-                        'headers': {
-                            'User-Agent': 'Mozilla/5.0 (compatible; RedditScraper/1.0; +https://example.com)',
-                            'Accept': 'application/json',
-                            'Accept-Charset': 'utf-8',
-                            'Cache-Control': 'no-cache'
-                        }
-                    },
-                    # Strategy 2: Simple API call
-                    {
-                        'url': f"https://www.reddit.com/r/{subreddit}/.json?limit=10",
-                        'headers': {
-                            'User-Agent': 'python-requests/2.28.1 (RedditAPI)',
-                            'Accept': 'application/json'
-                        }
-                    },
-                    # Strategy 3: Raw JSON parameter
-                    {
-                        'url': f"https://www.reddit.com/r/{subreddit}.json?raw_json=1&limit=10",
-                        'headers': {
-                            'User-Agent': 'Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; Trident/6.0)',
-                            'Accept': 'application/json, text/javascript, */*'
-                        }
-                    },
-                    # Strategy 4: Mobile user agent
-                    {
-                        'url': f"https://www.reddit.com/r/{subreddit}/hot/.json?limit=10",
-                        'headers': {
-                            'User-Agent': 'RedditIsiOS/2021.45.0',
-                            'Accept': 'application/json'
-                        }
-                    },
-                    # Strategy 5: Curl-based approach
-                    {
-                        'url': f"https://old.reddit.com/r/{subreddit}/.json?sort=hot&limit=10",
-                        'headers': {
-                            'User-Agent': 'curl/7.84.0',
-                            'Accept': 'application/json',
-                            'Host': 'old.reddit.com'
-                        }
+                # Strategy 1: Arctic Shift API (Best for serverless)
+                try:
+                    print(f"Trying Arctic Shift API for r/{subreddit}")
+                    
+                    arctic_url = f"https://arctic-shift.photon-reddit.com/api/posts/search"
+                    params = {
+                        'subreddit': subreddit,
+                        'limit': 10,
+                        'sort': 'created_utc:desc'
                     }
-                ]
+                    headers = {
+                        'User-Agent': 'Mozilla/5.0 (compatible; SocialScraper/1.0; +https://example.com)',
+                        'Accept': 'application/json'
+                    }
+                    
+                    response = requests.get(arctic_url, params=params, headers=headers, timeout=15)
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        posts = data.get('data', [])
+                        
+                        if posts:
+                            print(f"Arctic Shift success: Found {len(posts)} posts")
+                            
+                            for post in posts[:10]:
+                                results.append({
+                                    'platform': 'reddit',
+                                    'subreddit': f'r/{subreddit}',
+                                    'title': post.get('title', ''),
+                                    'text': post.get('selftext', '')[:500] if post.get('selftext') else '',
+                                    'author': post.get('author', 'Unknown'),
+                                    'score': post.get('score', 0),
+                                    'comments': post.get('num_comments', 0),
+                                    'url': f"https://reddit.com{post.get('permalink', '')}",
+                                    'created_at': datetime.fromtimestamp(post.get('created_utc', 0)).isoformat() if post.get('created_utc') else '',
+                                    'upvote_ratio': post.get('upvote_ratio', 0),
+                                    'awards': post.get('total_awards_received', 0),
+                                    'flair': post.get('link_flair_text'),
+                                    'is_video': post.get('is_video', False),
+                                    'thumbnail': post.get('thumbnail') if post.get('thumbnail') not in ['self', 'default'] else None,
+                                    'strategy_used': 'arctic_shift_api'
+                                })
+                            success = True
+                            
+                except Exception as arctic_error:
+                    print(f"Arctic Shift API error: {arctic_error}")
                 
-                for i, strategy in enumerate(strategies):
-                    if success:
-                        break
-                        
+                # Strategy 2: RSS Feed Fallback (More reliable for serverless)
+                if not success:
                     try:
-                        print(f"Trying Reddit strategy {i+1} for r/{subreddit}")
+                        print(f"Trying RSS feed for r/{subreddit}")
                         
-                        # Add small random delay to avoid rate limiting
-                        time.sleep(random.uniform(0.1, 0.3))
+                        rss_url = f"https://www.reddit.com/r/{subreddit}.rss"
+                        headers = {
+                            'User-Agent': 'Mozilla/5.0 (compatible; RedditRSSReader/1.0)',
+                            'Accept': 'application/rss+xml, application/xml, text/xml'
+                        }
                         
-                        response = requests.get(
-                            strategy['url'], 
-                            headers=strategy['headers'], 
-                            timeout=15,
-                            allow_redirects=True
-                        )
-                        
-                        print(f"Strategy {i+1} returned status: {response.status_code}")
+                        response = requests.get(rss_url, headers=headers, timeout=10)
                         
                         if response.status_code == 200:
-                            try:
-                                data = response.json()
-                                posts = data.get('data', {}).get('children', [])
+                            import xml.etree.ElementTree as ET
+                            
+                            # Parse RSS feed
+                            root = ET.fromstring(response.content)
+                            entries = root.findall('.//{http://www.w3.org/2005/Atom}entry')
+                            
+                            if entries:
+                                print(f"RSS feed success: Found {len(entries)} entries")
                                 
-                                if posts:
-                                    print(f"Strategy {i+1} success: Found {len(posts)} posts")
-                                    subreddit_posts = []
+                                for entry in entries[:10]:
+                                    title_elem = entry.find('.//{http://www.w3.org/2005/Atom}title')
+                                    author_elem = entry.find('.//{http://www.w3.org/2005/Atom}author/{http://www.w3.org/2005/Atom}name')
+                                    link_elem = entry.find('.//{http://www.w3.org/2005/Atom}link')
+                                    published_elem = entry.find('.//{http://www.w3.org/2005/Atom}published')
                                     
-                                    for post_item in posts[:10]:
-                                        post = post_item.get('data', {})
-                                        
-                                        subreddit_posts.append({
-                                            'platform': 'reddit',
-                                            'subreddit': f'r/{subreddit}',
-                                            'title': post.get('title', ''),
-                                            'text': post.get('selftext', '')[:500],
-                                            'author': post.get('author', 'Unknown'),
-                                            'score': post.get('score', 0),
-                                            'comments': post.get('num_comments', 0),
-                                            'url': f"https://reddit.com{post.get('permalink', '')}",
-                                            'created_at': datetime.fromtimestamp(post.get('created_utc', 0)).isoformat() if post.get('created_utc') else '',
-                                            'upvote_ratio': post.get('upvote_ratio', 0),
-                                            'awards': post.get('total_awards_received', 0),
-                                            'flair': post.get('link_flair_text'),
-                                            'is_video': post.get('is_video', False),
-                                            'thumbnail': post.get('thumbnail') if post.get('thumbnail') not in ['self', 'default'] else None,
-                                            'strategy_used': f'strategy_{i+1}'
-                                        })
+                                    title = title_elem.text if title_elem is not None else 'No title'
+                                    author = author_elem.text.replace('/u/', '') if author_elem is not None else 'Unknown'
+                                    url = link_elem.get('href') if link_elem is not None else ''
+                                    published = published_elem.text if published_elem is not None else ''
                                     
-                                    results.extend(subreddit_posts)
-                                    success = True
-                                    break
-                            except (ValueError, KeyError) as json_error:
-                                print(f"Strategy {i+1} JSON error: {json_error}")
-                                continue
+                                    results.append({
+                                        'platform': 'reddit',
+                                        'subreddit': f'r/{subreddit}',
+                                        'title': title,
+                                        'text': '',  # RSS doesn't include full text
+                                        'author': author,
+                                        'score': 0,  # Not available in RSS
+                                        'comments': 0,  # Not available in RSS
+                                        'url': url,
+                                        'created_at': published,
+                                        'upvote_ratio': 0,
+                                        'awards': 0,
+                                        'flair': None,
+                                        'is_video': False,
+                                        'thumbnail': None,
+                                        'strategy_used': 'rss_feed'
+                                    })
+                                success = True
                                 
-                    except requests.RequestException as req_error:
-                        print(f"Strategy {i+1} request error: {req_error}")
-                        continue
+                    except Exception as rss_error:
+                        print(f"RSS feed error: {rss_error}")
+                
+                # Strategy 3: JSON API fallback (less reliable in serverless)
+                if not success:
+                    try:
+                        print(f"Trying JSON API for r/{subreddit}")
+                        
+                        json_url = f"https://old.reddit.com/r/{subreddit}/hot.json?limit=10"
+                        headers = {
+                            'User-Agent': 'Mozilla/5.0 (compatible; RedditScraper/1.0)',
+                            'Accept': 'application/json'
+                        }
+                        
+                        response = requests.get(json_url, headers=headers, timeout=10)
+                        
+                        if response.status_code == 200:
+                            data = response.json()
+                            posts = data.get('data', {}).get('children', [])
+                            
+                            if posts:
+                                print(f"JSON API success: Found {len(posts)} posts")
+                                
+                                for post_item in posts[:10]:
+                                    post = post_item.get('data', {})
+                                    
+                                    results.append({
+                                        'platform': 'reddit',
+                                        'subreddit': f'r/{subreddit}',
+                                        'title': post.get('title', ''),
+                                        'text': post.get('selftext', '')[:500],
+                                        'author': post.get('author', 'Unknown'),
+                                        'score': post.get('score', 0),
+                                        'comments': post.get('num_comments', 0),
+                                        'url': f"https://reddit.com{post.get('permalink', '')}",
+                                        'created_at': datetime.fromtimestamp(post.get('created_utc', 0)).isoformat() if post.get('created_utc') else '',
+                                        'upvote_ratio': post.get('upvote_ratio', 0),
+                                        'awards': post.get('total_awards_received', 0),
+                                        'flair': post.get('link_flair_text'),
+                                        'is_video': post.get('is_video', False),
+                                        'thumbnail': post.get('thumbnail') if post.get('thumbnail') not in ['self', 'default'] else None,
+                                        'strategy_used': 'json_api'
+                                    })
+                                success = True
+                                
+                    except Exception as json_error:
+                        print(f"JSON API error: {json_error}")
                 
                 # If all strategies failed
                 if not success:
                     results.append({
                         'platform': 'reddit',
                         'subreddit': f'r/{subreddit}',
-                        'error': 'All Reddit access strategies blocked or failed',
-                        'note': 'Reddit may be blocking serverless requests. Try again later.'
+                        'error': 'All Reddit access methods failed',
+                        'note': 'Try again later or check subreddit name',
+                        'available_methods': ['Arctic Shift API', 'RSS Feed', 'JSON API'],
+                        'recommendation': 'Arctic Shift API is most reliable for serverless environments'
                     })
                     
             except Exception as e:
