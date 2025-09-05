@@ -156,72 +156,141 @@ class UnifiedScraper:
     def scrape_reddit(self, sources, options):
         import requests
         from datetime import datetime
+        import time
+        import random
         
         results = []
         print(f"Reddit scraping started with sources: {sources}")
+        
         for source in sources:
             try:
                 # Clean subreddit name
                 subreddit = source.strip().replace('r/', '').replace('/', '')
+                success = False
                 
-                # Use Reddit JSON API directly with better headers for serverless
-                url = f"https://www.reddit.com/r/{subreddit}/hot.json"
-                headers = {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                    'Accept': 'application/json, text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                    'Accept-Language': 'en-US,en;q=0.5',
-                    'Accept-Encoding': 'gzip, deflate',
-                    'Cache-Control': 'no-cache',
-                    'Pragma': 'no-cache'
-                }
+                # Multiple fallback strategies for Reddit
+                strategies = [
+                    # Strategy 1: Old Reddit with random user agents
+                    {
+                        'url': f"https://old.reddit.com/r/{subreddit}/hot.json",
+                        'headers': {
+                            'User-Agent': f'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1',
+                            'Accept': 'application/json, text/plain, */*',
+                            'Accept-Language': 'en-US,en;q=0.9',
+                            'Referer': f'https://old.reddit.com/r/{subreddit}/',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    },
+                    # Strategy 2: Mobile Reddit API
+                    {
+                        'url': f"https://i.reddit.com/r/{subreddit}/hot.json",
+                        'headers': {
+                            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15',
+                            'Accept': 'application/json',
+                            'Accept-Language': 'en-us',
+                            'Accept-Encoding': 'gzip, deflate, br'
+                        }
+                    },
+                    # Strategy 3: Standard with different UA
+                    {
+                        'url': f"https://www.reddit.com/r/{subreddit}/hot.json",
+                        'headers': {
+                            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                            'Accept-Language': 'en-US,en;q=0.5',
+                            'Accept-Encoding': 'gzip, deflate, br',
+                            'DNT': '1',
+                            'Connection': 'keep-alive',
+                            'Upgrade-Insecure-Requests': '1'
+                        }
+                    },
+                    # Strategy 4: RSS-style approach
+                    {
+                        'url': f"https://www.reddit.com/r/{subreddit}/.json",
+                        'headers': {
+                            'User-Agent': 'curl/7.68.0',
+                            'Accept': 'application/json'
+                        }
+                    }
+                ]
                 
-                response = requests.get(url, headers=headers, timeout=10)
-                if response.status_code == 200:
-                    data = response.json()
-                    posts = data.get('data', {}).get('children', [])
-                    
-                    subreddit_posts = []
-                    for post_item in posts[:10]:  # Limit to 10 posts
-                        post = post_item.get('data', {})
+                for i, strategy in enumerate(strategies):
+                    if success:
+                        break
                         
-                        subreddit_posts.append({
-                            'platform': 'reddit',
-                            'subreddit': f'r/{subreddit}',
-                            'title': post.get('title', ''),
-                            'text': post.get('selftext', '')[:500],  # Limit text length
-                            'author': post.get('author', 'Unknown'),
-                            'score': post.get('score', 0),
-                            'comments': post.get('num_comments', 0),
-                            'url': f"https://reddit.com{post.get('permalink', '')}",
-                            'created_at': datetime.fromtimestamp(post.get('created_utc', 0)).isoformat() if post.get('created_utc') else '',
-                            'upvote_ratio': post.get('upvote_ratio', 0),
-                            'awards': post.get('total_awards_received', 0),
-                            'flair': post.get('link_flair_text'),
-                            'is_video': post.get('is_video', False),
-                            'thumbnail': post.get('thumbnail') if post.get('thumbnail') not in ['self', 'default'] else None
-                        })
-                    
-                    if subreddit_posts:
-                        results.extend(subreddit_posts)
-                    else:
-                        results.append({
-                            'platform': 'reddit',
-                            'subreddit': f'r/{subreddit}',
-                            'error': 'No posts found in subreddit'
-                        })
-                else:
+                    try:
+                        print(f"Trying Reddit strategy {i+1} for r/{subreddit}")
+                        
+                        # Add small random delay to avoid rate limiting
+                        time.sleep(random.uniform(0.1, 0.3))
+                        
+                        response = requests.get(
+                            strategy['url'], 
+                            headers=strategy['headers'], 
+                            timeout=15,
+                            allow_redirects=True
+                        )
+                        
+                        print(f"Strategy {i+1} returned status: {response.status_code}")
+                        
+                        if response.status_code == 200:
+                            try:
+                                data = response.json()
+                                posts = data.get('data', {}).get('children', [])
+                                
+                                if posts:
+                                    print(f"Strategy {i+1} success: Found {len(posts)} posts")
+                                    subreddit_posts = []
+                                    
+                                    for post_item in posts[:10]:
+                                        post = post_item.get('data', {})
+                                        
+                                        subreddit_posts.append({
+                                            'platform': 'reddit',
+                                            'subreddit': f'r/{subreddit}',
+                                            'title': post.get('title', ''),
+                                            'text': post.get('selftext', '')[:500],
+                                            'author': post.get('author', 'Unknown'),
+                                            'score': post.get('score', 0),
+                                            'comments': post.get('num_comments', 0),
+                                            'url': f"https://reddit.com{post.get('permalink', '')}",
+                                            'created_at': datetime.fromtimestamp(post.get('created_utc', 0)).isoformat() if post.get('created_utc') else '',
+                                            'upvote_ratio': post.get('upvote_ratio', 0),
+                                            'awards': post.get('total_awards_received', 0),
+                                            'flair': post.get('link_flair_text'),
+                                            'is_video': post.get('is_video', False),
+                                            'thumbnail': post.get('thumbnail') if post.get('thumbnail') not in ['self', 'default'] else None,
+                                            'strategy_used': f'strategy_{i+1}'
+                                        })
+                                    
+                                    results.extend(subreddit_posts)
+                                    success = True
+                                    break
+                            except (ValueError, KeyError) as json_error:
+                                print(f"Strategy {i+1} JSON error: {json_error}")
+                                continue
+                                
+                    except requests.RequestException as req_error:
+                        print(f"Strategy {i+1} request error: {req_error}")
+                        continue
+                
+                # If all strategies failed
+                if not success:
                     results.append({
                         'platform': 'reddit',
                         'subreddit': f'r/{subreddit}',
-                        'error': f'HTTP {response.status_code}: Could not access subreddit'
+                        'error': 'All Reddit access strategies blocked or failed',
+                        'note': 'Reddit may be blocking serverless requests. Try again later.'
                     })
                     
             except Exception as e:
                 results.append({
                     'platform': 'reddit',
                     'subreddit': source,
-                    'error': str(e)
+                    'error': f'Unexpected error: {str(e)}'
                 })
+        
+        print(f"Reddit scraping completed. Total results: {len(results)}")
         return results
     
     def scrape_facebook(self, sources, cookies, options):
