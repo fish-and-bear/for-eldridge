@@ -27,6 +27,12 @@ try:
 except ImportError:
     ENHANCED_TWITTER_AVAILABLE = False
 
+try:
+    from xcancel_cloudflare import XCancelCloudflare
+    XCANCEL_CF_AVAILABLE = True
+except ImportError:
+    XCANCEL_CF_AVAILABLE = False
+
 class UnifiedScraper:
     def __init__(self):
         if SCRAPERS_AVAILABLE:
@@ -49,6 +55,12 @@ class UnifiedScraper:
             self.enhanced_twitter = EnhancedTwitterScraper()
         else:
             self.enhanced_twitter = None
+        
+        # Initialize xcancel with cloudflare bypass if available
+        if XCANCEL_CF_AVAILABLE:
+            self.xcancel_cf = XCancelCloudflare()
+        else:
+            self.xcancel_cf = None
     
     def scrape_twitter(self, sources, bearer_token, cookies, options=None):
         results = []
