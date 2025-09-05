@@ -175,10 +175,11 @@ class UnifiedScraper:
                     data = response.json()
                     posts = data.get('data', {}).get('children', [])
                     
+                    subreddit_posts = []
                     for post_item in posts[:10]:  # Limit to 10 posts
                         post = post_item.get('data', {})
                         
-                        results.append({
+                        subreddit_posts.append({
                             'platform': 'reddit',
                             'subreddit': f'r/{subreddit}',
                             'title': post.get('title', ''),
@@ -194,12 +195,20 @@ class UnifiedScraper:
                             'is_video': post.get('is_video', False),
                             'thumbnail': post.get('thumbnail') if post.get('thumbnail') not in ['self', 'default'] else None
                         })
-                
-                if not results:
+                    
+                    if subreddit_posts:
+                        results.extend(subreddit_posts)
+                    else:
+                        results.append({
+                            'platform': 'reddit',
+                            'subreddit': f'r/{subreddit}',
+                            'error': 'No posts found in subreddit'
+                        })
+                else:
                     results.append({
                         'platform': 'reddit',
                         'subreddit': f'r/{subreddit}',
-                        'error': 'No posts found or subreddit may be private'
+                        'error': f'HTTP {response.status_code}: Could not access subreddit'
                     })
                     
             except Exception as e:
