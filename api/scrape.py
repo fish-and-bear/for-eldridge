@@ -93,31 +93,53 @@ class UnifiedScraper:
         return results
     
     def scrape_reddit(self, sources, options):
-        if not self.advanced_scraper:
-            return [{"error": "Reddit scraper not available"}]
+        import requests
+        from datetime import datetime
         
         results = []
         for source in sources:
             try:
-                source_urls = [f'r/{source.strip().replace("r/", "")}']
-                scraped_data = self.advanced_scraper.scrape(source_urls, {'limit': 10})
-                for item in scraped_data:
-                    if item.get('platform') == 'reddit':
+                # Clean subreddit name
+                subreddit = source.strip().replace('r/', '').replace('/', '')
+                
+                # Use Reddit JSON API directly
+                url = f"https://www.reddit.com/r/{subreddit}/hot.json"
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (compatible; SocialScraper/1.0)'
+                }
+                
+                response = requests.get(url, headers=headers, timeout=10)
+                if response.status_code == 200:
+                    data = response.json()
+                    posts = data.get('data', {}).get('children', [])
+                    
+                    for post_item in posts[:10]:  # Limit to 10 posts
+                        post = post_item.get('data', {})
+                        
                         results.append({
                             'platform': 'reddit',
-                            'subreddit': item.get('subreddit', source),
-                            'title': item.get('title', ''),
-                            'text': item.get('content', ''),
-                            'author': item.get('author', ''),
-                            'score': item.get('engagement', {}).get('score', 0),
-                            'url': item.get('url', '')
+                            'subreddit': f'r/{subreddit}',
+                            'title': post.get('title', ''),
+                            'text': post.get('selftext', '')[:500],  # Limit text length
+                            'author': post.get('author', 'Unknown'),
+                            'score': post.get('score', 0),
+                            'comments': post.get('num_comments', 0),
+                            'url': f"https://reddit.com{post.get('permalink', '')}",
+                            'created_at': datetime.fromtimestamp(post.get('created_utc', 0)).isoformat() if post.get('created_utc') else '',
+                            'upvote_ratio': post.get('upvote_ratio', 0),
+                            'awards': post.get('total_awards_received', 0),
+                            'flair': post.get('link_flair_text'),
+                            'is_video': post.get('is_video', False),
+                            'thumbnail': post.get('thumbnail') if post.get('thumbnail') not in ['self', 'default'] else None
                         })
+                
                 if not results:
                     results.append({
                         'platform': 'reddit',
-                        'subreddit': source,
-                        'error': 'No posts found'
+                        'subreddit': f'r/{subreddit}',
+                        'error': 'No posts found or subreddit may be private'
                     })
+                    
             except Exception as e:
                 results.append({
                     'platform': 'reddit',
