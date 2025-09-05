@@ -664,7 +664,25 @@ class handler(BaseHTTPRequestHandler):
             print(f"Routing to platform: {platform} with sources: {sources}")
             if platform == 'twitter':
                 options = data.get('options', {})
-                results = scraper.scrape_twitter(sources, '', '', options)
+                
+                # Check if we need to fetch comments/replies
+                if options.get('include_comments', False):
+                    # For comment fetching, we need to process each tweet URL individually
+                    enhanced_results = []
+                    base_results = scraper.scrape_twitter(sources, '', '', options)
+                    
+                    for result in base_results:
+                        enhanced_results.append(result)
+                        
+                        # If this has a tweet URL, try to fetch replies
+                        if result.get('url') and '/status/' in result.get('url', ''):
+                            # Add a note about replies
+                            result['replies_note'] = 'Fetching replies requires authentication. Twitter has restricted access to conversation threads.'
+                            result['has_replies'] = True
+                    
+                    results = enhanced_results
+                else:
+                    results = scraper.scrape_twitter(sources, '', '', options)
             elif platform == 'instagram':
                 results = scraper.scrape_instagram(sources, {})
             elif platform == 'reddit':

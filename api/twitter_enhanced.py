@@ -53,6 +53,16 @@ class EnhancedTwitterScraper:
                     likes = self._parse_count(likes_match.group(1) if likes_match else "0")
                     retweets = self._parse_count(retweets_match.group(1) if retweets_match else "0")
                     
+                    # Extract relative time if available (e.g., "2h", "1d")
+                    time_str = ''
+                    time_match = re.search(rf'data-tweet-id="{tweet_id}".*?class="timeline-Tweet-timestamp.*?>(.*?)<', html_content, re.DOTALL)
+                    if time_match:
+                        time_str = time_match.group(1).strip()
+                    
+                    # If no time found, use current time as fallback
+                    if not time_str:
+                        time_str = datetime.now().isoformat()
+                    
                     tweets.append({
                         'id': tweet_id,
                         'text': text,
@@ -60,6 +70,7 @@ class EnhancedTwitterScraper:
                         'url': f'https://twitter.com/{username}/status/{tweet_id}',
                         'likes': likes,
                         'retweets': retweets,
+                        'created_at': time_str,  # Add date field
                         'source': 'syndication_enhanced'
                     })
                 
