@@ -21,6 +21,12 @@ try:
 except ImportError:
     XCANCEL_AVAILABLE = False
 
+try:
+    from twitter_enhanced import EnhancedTwitterScraper
+    ENHANCED_TWITTER_AVAILABLE = True
+except ImportError:
+    ENHANCED_TWITTER_AVAILABLE = False
+
 class UnifiedScraper:
     def __init__(self):
         if SCRAPERS_AVAILABLE:
@@ -37,16 +43,89 @@ class UnifiedScraper:
             self.xcancel_scraper = XCancelTwitterScraper()
         else:
             self.xcancel_scraper = None
+        
+        # Initialize enhanced twitter scraper if available
+        if ENHANCED_TWITTER_AVAILABLE:
+            self.enhanced_twitter = EnhancedTwitterScraper()
+        else:
+            self.enhanced_twitter = None
     
-    def scrape_twitter(self, sources, bearer_token, cookies):
+    def scrape_twitter(self, sources, bearer_token, cookies, options=None):
         results = []
+        options = options or {}
         
         for source in sources:
+            # Check if source is a search query
+            if source.startswith('search:'):
+                query = source.replace('search:', '').strip()
+                
+                # Try search functionality
+                if self.enhanced_twitter:
+                    try:
+                        search_results = self.enhanced_twitter.search_tweets(query, limit=20)
+                        for result in search_results:
+                            results.append({
+                                'platform': 'twitter',
+                                'search_query': query,
+                                'text': result.get('text', result.get('info', '')),
+                                'source': 'search',
+                                **result
+                            })
+                    except Exception as e:
+                        results.append({
+                            'platform': 'twitter',
+                            'search_query': query,
+                            'error': f'Search failed: {str(e)}'
+                        })
+                continue
+            
+            # Check if source is a tweet URL for fetching with replies
+            if '/status/' in source:
+                if self.enhanced_twitter:
+                    try:
+                        tweet_data = self.enhanced_twitter.get_tweet_with_replies(source)
+                        if tweet_data:
+                            results.append({
+                                'platform': 'twitter',
+                                'tweet_url': source,
+                                **tweet_data
+                            })
+                    except Exception as e:
+                        results.append({
+                            'platform': 'twitter',
+                            'tweet_url': source,
+                            'error': f'Failed to fetch tweet: {str(e)}'
+                        })
+                continue
+            
+            # Regular username timeline scraping
             username = source.strip().replace('@', '')
             tweets_found = False
             
-            # Strategy 1: Try xcancel first for complete timeline
-            if self.xcancel_scraper:
+            # Strategy 1: Try enhanced scraper first for more complete timeline
+            if self.enhanced_twitter:
+                try:
+                    tweets = self.enhanced_twitter.scrape_user_timeline(username, limit=50)
+                    if tweets and not any('error' in tweet for tweet in tweets):
+                        for tweet in tweets:
+                            results.append({
+                                'platform': 'twitter',
+                                'username': f'@{username}',
+                                'text': tweet.get('text', ''),
+                                'created_at': tweet.get('created_at', ''),
+                                'likes': tweet.get('likes', 0),
+                                'retweets': tweet.get('retweets', 0),
+                                'replies': tweet.get('replies', 0),
+                                'url': tweet.get('url', ''),
+                                'media': tweet.get('media', []),
+                                'source': 'syndication_enhanced'
+                            })
+                        tweets_found = True
+                except Exception:
+                    pass
+            
+            # Strategy 2: Try xcancel if available
+            if not tweets_found and self.xcancel_scraper:
                 try:
                     tweets = self.xcancel_scraper.scrape_user_timeline(username, limit=30)
                     if tweets and not any('error' in tweet for tweet in tweets):
@@ -69,7 +148,7 @@ class UnifiedScraper:
                 except Exception:
                     pass  # Fallback to syndication API
             
-            # Strategy 2: Fallback to Twitter Syndication API
+            # Strategy 3: Fallback to basic Twitter Syndication API
             if not tweets_found and self.twitter_scraper:
                 try:
                     tweets = self.twitter_scraper.scrape_user_timeline(username, limit=20)
@@ -584,7 +663,8 @@ class handler(BaseHTTPRequestHandler):
             # Route to appropriate scraper
             print(f"Routing to platform: {platform} with sources: {sources}")
             if platform == 'twitter':
-                results = scraper.scrape_twitter(sources, '', '')
+                options = data.get('options', {})
+                results = scraper.scrape_twitter(sources, '', '', options)
             elif platform == 'instagram':
                 results = scraper.scrape_instagram(sources, {})
             elif platform == 'reddit':
