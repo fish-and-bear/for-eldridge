@@ -168,22 +168,22 @@ class UnifiedScraper:
                 subreddit = source.strip().replace('r/', '').replace('/', '')
                 success = False
                 
-                # Strategy 1: Arctic Shift API (Best for serverless)
+                # Strategy 1: Arctic Shift API (Best for serverless) - PRIORITY
                 try:
                     print(f"Trying Arctic Shift API for r/{subreddit}")
                     
-                    arctic_url = f"https://arctic-shift.photon-reddit.com/api/posts/search"
+                    arctic_url = "https://arctic-shift.photon-reddit.com/api/posts/search"
                     params = {
                         'subreddit': subreddit,
-                        'limit': 10,
-                        'sort': 'created_utc:desc'
+                        'limit': 10
                     }
                     headers = {
                         'User-Agent': 'Mozilla/5.0 (compatible; SocialScraper/1.0; +https://example.com)',
-                        'Accept': 'application/json'
+                        'Accept': 'application/json',
+                        'Connection': 'keep-alive'
                     }
                     
-                    response = requests.get(arctic_url, params=params, headers=headers, timeout=15)
+                    response = requests.get(arctic_url, params=params, headers=headers, timeout=20)
                     
                     if response.status_code == 200:
                         data = response.json()
@@ -193,7 +193,7 @@ class UnifiedScraper:
                             print(f"Arctic Shift success: Found {len(posts)} posts")
                             
                             for post in posts[:10]:
-                                results.append({
+                                post_data = {
                                     'platform': 'reddit',
                                     'subreddit': f'r/{subreddit}',
                                     'title': post.get('title', ''),
@@ -208,9 +208,50 @@ class UnifiedScraper:
                                     'flair': post.get('link_flair_text'),
                                     'is_video': post.get('is_video', False),
                                     'thumbnail': post.get('thumbnail') if post.get('thumbnail') not in ['self', 'default'] else None,
-                                    'strategy_used': 'arctic_shift_api'
-                                })
-                            success = True
+                                    'strategy_used': 'arctic_shift_api',
+                                    'post_id': post.get('id')
+                                }
+                                
+                                # Fetch comments if requested
+                                if options.get('fetch_comments', False):
+                                    try:
+                                        post_id = post.get('id')
+                                        if post_id:
+                                            print(f"Fetching comments for post {post_id}")
+                                            comments_url = "https://arctic-shift.photon-reddit.com/api/comments/search"
+                                            comments_params = {
+                                                'link_id': f't3_{post_id}',
+                                                'limit': 50
+                                            }
+                                            comments_response = requests.get(comments_url, params=comments_params, headers=headers, timeout=15)
+                                            
+                                            if comments_response.status_code == 200:
+                                                comments_data = comments_response.json()
+                                                comment_list = []
+                                                
+                                                for comment in comments_data.get('data', []):
+                                                    if comment.get('body') and comment.get('body') not in ['[removed]', '[deleted]']:
+                                                        comment_list.append({
+                                                            'author': comment.get('author', 'Unknown'),
+                                                            'body': comment.get('body', ''),
+                                                            'score': comment.get('score', 0),
+                                                            'created_at': datetime.fromtimestamp(comment.get('created_utc', 0)).isoformat() if comment.get('created_utc') else '',
+                                                            'permalink': f"https://reddit.com{comment.get('permalink', '')}"
+                                                        })
+                                                
+                                                post_data['comments'] = comment_list
+                                                post_data['comments_fetched'] = len(comment_list)
+                                                print(f"Fetched {len(comment_list)} comments for post {post_id}")
+                                            else:
+                                                print(f"Comments fetch failed for post {post_id}: {comments_response.status_code}")
+                                    except Exception as comment_error:
+                                        print(f"Error fetching comments: {comment_error}")
+                                        post_data['comment_fetch_error'] = str(comment_error)
+                                
+                                results.append(post_data)
+                            
+                            print(f"✅ Arctic Shift API SUCCESS: Found {len(results)} posts")
+                            return {'status': 'success', 'data': results, 'source': 'arctic_shift_api'}
                             
                 except Exception as arctic_error:
                     print(f"Arctic Shift API error: {arctic_error}")
