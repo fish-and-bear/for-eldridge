@@ -168,48 +168,49 @@ class UnifiedScraper:
                 subreddit = source.strip().replace('r/', '').replace('/', '')
                 success = False
                 
-                # Multiple fallback strategies for Reddit
+                # Multiple fallback strategies for Reddit - optimized for serverless
                 strategies = [
-                    # Strategy 1: Old Reddit with random user agents
+                    # Strategy 1: Old Reddit - most reliable for serverless
                     {
-                        'url': f"https://old.reddit.com/r/{subreddit}/hot.json",
+                        'url': f"https://old.reddit.com/r/{subreddit}/hot.json?limit=10",
                         'headers': {
-                            'User-Agent': f'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1',
-                            'Accept': 'application/json, text/plain, */*',
-                            'Accept-Language': 'en-US,en;q=0.9',
-                            'Referer': f'https://old.reddit.com/r/{subreddit}/',
-                            'X-Requested-With': 'XMLHttpRequest'
-                        }
-                    },
-                    # Strategy 2: Mobile Reddit API
-                    {
-                        'url': f"https://i.reddit.com/r/{subreddit}/hot.json",
-                        'headers': {
-                            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15',
+                            'User-Agent': 'Mozilla/5.0 (compatible; RedditScraper/1.0; +https://example.com)',
                             'Accept': 'application/json',
-                            'Accept-Language': 'en-us',
-                            'Accept-Encoding': 'gzip, deflate, br'
+                            'Accept-Charset': 'utf-8',
+                            'Cache-Control': 'no-cache'
                         }
                     },
-                    # Strategy 3: Standard with different UA
+                    # Strategy 2: Simple API call
                     {
-                        'url': f"https://www.reddit.com/r/{subreddit}/hot.json",
+                        'url': f"https://www.reddit.com/r/{subreddit}/.json?limit=10",
                         'headers': {
-                            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                            'Accept-Language': 'en-US,en;q=0.5',
-                            'Accept-Encoding': 'gzip, deflate, br',
-                            'DNT': '1',
-                            'Connection': 'keep-alive',
-                            'Upgrade-Insecure-Requests': '1'
-                        }
-                    },
-                    # Strategy 4: RSS-style approach
-                    {
-                        'url': f"https://www.reddit.com/r/{subreddit}/.json",
-                        'headers': {
-                            'User-Agent': 'curl/7.68.0',
+                            'User-Agent': 'python-requests/2.28.1 (RedditAPI)',
                             'Accept': 'application/json'
+                        }
+                    },
+                    # Strategy 3: Raw JSON parameter
+                    {
+                        'url': f"https://www.reddit.com/r/{subreddit}.json?raw_json=1&limit=10",
+                        'headers': {
+                            'User-Agent': 'Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; Trident/6.0)',
+                            'Accept': 'application/json, text/javascript, */*'
+                        }
+                    },
+                    # Strategy 4: Mobile user agent
+                    {
+                        'url': f"https://www.reddit.com/r/{subreddit}/hot/.json?limit=10",
+                        'headers': {
+                            'User-Agent': 'RedditIsiOS/2021.45.0',
+                            'Accept': 'application/json'
+                        }
+                    },
+                    # Strategy 5: Curl-based approach
+                    {
+                        'url': f"https://old.reddit.com/r/{subreddit}/.json?sort=hot&limit=10",
+                        'headers': {
+                            'User-Agent': 'curl/7.84.0',
+                            'Accept': 'application/json',
+                            'Host': 'old.reddit.com'
                         }
                     }
                 ]
